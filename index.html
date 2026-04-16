@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Control Stock</title>
+
+  <style>
+    :root{
+      --ink:#0e1b2a;
+
+      --green:#7fe28f;
+      --green-soft:#f4fdf6;
+
+      --red:#e69095;
+      --red-soft:#fdf4f4;
+
+      --stroke:#0e1b2a;
+      --radius:16px;
+      --shadow:0 8px 20px rgba(0,0,0,.15);
+    }
+
+    *{
+      box-sizing:border-box;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    }
+
+    body{
+      margin:0;
+      background:#fff;
+      display:flex;
+      justify-content:center;
+      padding:24px 14px;
+      color:var(--ink);
+    }
+
+    .app{
+      width:min(430px,100%);
+    }
+
+    .header{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      margin-bottom:28px;
+    }
+
+    .logo{
+      width:60px;
+      height:60px;
+    }
+
+    .logo img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+    }
+
+    h1{
+      margin:0;
+      font-size:30px;
+      letter-spacing:.5px;
+      white-space:nowrap;
+    }
+
+    .field{
+      margin-bottom:18px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    label{
+      font-size:13px;
+      font-weight:600;
+      opacity:.7;
+    }
+
+    input, textarea{
+      padding:14px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.25);
+      font-size:16px;
+      outline:none;
+    }
+
+    textarea{
+      min-height:70px;
+      resize:vertical;
+    }
+
+    .checkbox-field{
+      margin-bottom:18px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:14px;
+      border:1px solid rgba(0,0,0,.25);
+      border-radius:12px;
+    }
+
+    .checkbox-field input[type="checkbox"]{
+      width:20px;
+      height:20px;
+      margin:0;
+      padding:0;
+      accent-color: var(--ink);
+      cursor:pointer;
+    }
+
+    .checkbox-field label{
+      margin:0;
+      font-size:16px;
+      font-weight:600;
+      opacity:1;
+      cursor:pointer;
+    }
+
+    .btn{
+      width:100%;
+      padding:20px;
+      border-radius:var(--radius);
+      border:2px solid var(--stroke);
+      font-weight:800;
+      font-size:26px;
+      letter-spacing:.5px;
+      cursor:pointer;
+      margin-top:16px;
+      transition: background .2s ease, opacity .15s ease, filter .15s ease;
+    }
+
+    .green{
+      background:var(--green-soft);
+      color:#fff;
+    }
+
+    .red{
+      background:var(--red-soft);
+      color:#fff;
+      margin-top:28px;
+    }
+
+    .btn:not(:disabled).green{
+      background:var(--green);
+      box-shadow:var(--shadow);
+    }
+
+    .btn:not(:disabled).red{
+      background:var(--red);
+      box-shadow:var(--shadow);
+    }
+
+    .btn:disabled{
+      opacity:1;
+      cursor:not-allowed;
+      filter:none;
+      box-shadow:none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="logo">
+        <img src="Ametller.png" alt="Ametller">
+      </div>
+      <h1>CONTROL STOCK</h1>
+    </div>
+
+    <div class="field">
+      <label>CÓDIGO</label>
+      <input id="codigo" placeholder="Lee código de barras..." autocomplete="off" autofocus />
+    </div>
+
+    <div class="field">
+      <label>UBICACIÓN</label>
+      <input id="ubicacion" placeholder="Lee código de ubicación" autocomplete="off" />
+    </div>
+
+    <div class="checkbox-field">
+      <input type="checkbox" id="moverPartidaEntera" />
+      <label for="moverPartidaEntera">¿Mover partida entera?</label>
+    </div>
+
+    <div class="field">
+      <label>NOTAS (opcional)</label>
+      <textarea id="notas" placeholder="Observaciones..."></textarea>
+    </div>
+
+    <button id="btnEntrada" class="btn green" onclick="sendMovement('ENTRADA')" disabled>ENTRADA</button>
+    <button id="btnSalida" class="btn red" onclick="sendMovement('SALIDA')" disabled>SALIDA</button>
+  </div>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbylxFU7hiKRxFsCBlsmDdQhqKg35Fp74oRLEuHAPCYDxhc2L25TASLJwHWHNc4EQzPs/exec";
+
+    const elCodigo = document.getElementById("codigo");
+    const elUbic = document.getElementById("ubicacion");
+    const elNotas = document.getElementById("notas");
+    const elMoverPartidaEntera = document.getElementById("moverPartidaEntera");
+    const btnEntrada = document.getElementById("btnEntrada");
+    const btnSalida = document.getElementById("btnSalida");
+
+    window.addEventListener("load", () => {
+      elCodigo.focus();
+    });
+
+    // Toast no bloqueante
+    const toast = document.createElement("div");
+    toast.style.cssText = `
+      position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+      padding:10px 14px; border:1px solid rgba(0,0,0,.2); border-radius:999px;
+      background:white; box-shadow:0 8px 20px rgba(0,0,0,.15);
+      font-weight:800; font-size:13px; opacity:0; transition:opacity .15s ease;
+      z-index:9999;
+    `;
+    document.body.appendChild(toast);
+
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.style.opacity = "1";
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => (toast.style.opacity = "0"), 1200);
+    }
+
+    // VALIDACIONES
+    // Código: 10–14 dígitos numéricos
+    // Ubicación: exactamente 4 caracteres alfanuméricos
+    function refreshButtons(){
+      const codigo = elCodigo.value.trim();
+      const ubic = elUbic.value.trim();
+
+      const errorCodigo = document.getElementById("codigoError");
+
+      const codigoValido = /^\d{10,14}$/.test(codigo);
+      const ubicValida = /^[A-Za-z0-9]{4}$/.test(ubic);
+
+      if(errorCodigo){
+        errorCodigo.style.display = (codigo && !codigoValido) ? "block" : "none";
+      }
+
+      btnEntrada.disabled = !(codigoValido && ubicValida);
+      btnSalida.disabled = !codigoValido;
+    }
+
+    elCodigo.addEventListener("input", refreshButtons);
+    elUbic.addEventListener("input", refreshButtons);
+    elNotas.addEventListener("input", refreshButtons);
+    elMoverPartidaEntera.addEventListener("change", refreshButtons);
+    refreshButtons();
+
+    // Cola local
+    const QKEY = "movimientos_queue_v1";
+
+    function loadQueue(){
+      try { return JSON.parse(localStorage.getItem(QKEY) || "[]"); }
+      catch { return []; }
+    }
+
+    function saveQueue(q){
+      localStorage.setItem(QKEY, JSON.stringify(q));
+    }
+
+    function enqueue(item){
+      const q = loadQueue();
+      q.push(item);
+      saveQueue(q);
+      return q.length;
+    }
+
+    function dequeue(){
+      const q = loadQueue();
+      const item = q.shift();
+      saveQueue(q);
+      return item;
+    }
+
+    function queueLength(){
+      return loadQueue().length;
+    }
+
+    let sending = false;
+
+    async function sendOne(item){
+      const url = new URL(API_URL);
+      url.searchParams.set("tipo", item.tipo);
+      url.searchParams.set("codigo", item.codigo);
+      url.searchParams.set("ubicacion", item.ubicacion);
+      url.searchParams.set("notas", item.notas);
+      url.searchParams.set("mover_partida_entera", item.mover_partida_entera ? "SI" : "NO");
+      url.searchParams.set("ts_client", item.ts_client);
+      url.searchParams.set("id", item.id);
+
+      const res = await fetch(url.toString(), { method:"GET", cache:"no-store" });
+      const data = await res.json().catch(() => ({}));
+      if(!(res.ok && data.ok)) throw new Error("API error");
+    }
+
+    async function flushQueue(){
+      if(sending) return;
+      sending = true;
+
+      try{
+        while(queueLength() > 0){
+          const item = loadQueue()[0];
+          try{
+            await sendOne(item);
+            dequeue();
+            showToast(`Enviado ✓ (pendientes: ${queueLength()})`);
+          }catch(e){
+            showToast(`Pendiente ⏳ (pendientes: ${queueLength()})`);
+            break;
+          }
+        }
+      } finally {
+        sending = false;
+      }
+    }
+
+    window.addEventListener("online", flushQueue);
+    setInterval(flushQueue, 4000);
+
+    function makeId(){
+      return (Date.now().toString(36) + Math.random().toString(36).slice(2,8)).toUpperCase();
+    }
+
+    async function sendMovement(tipo){
+      const codigo = elCodigo.value.trim();
+      const ubicacion = elUbic.value.trim();
+      const notas = elNotas.value.trim();
+      const moverPartidaEntera = elMoverPartidaEntera.checked;
+
+      if(!/^\d{10,14}$/.test(codigo)){
+        showToast("Código inválido (10-14 dígitos)");
+        return;
+      }
+
+      if(tipo === "ENTRADA" && !/^[A-Za-z0-9]{4}$/.test(ubicacion)){
+        showToast("Ubicación inválida (4 caracteres alfanuméricos)");
+        return;
+      }
+
+      const item = {
+        id: makeId(),
+        tipo,
+        codigo,
+        ubicacion,
+        notas,
+        mover_partida_entera: moverPartidaEntera,
+        ts_client: new Date().toISOString()
+      };
+
+      const pending = enqueue(item);
+
+      elCodigo.value = "";
+      elNotas.value = "";
+      elUbic.value = "";
+      elMoverPartidaEntera.checked = false;
+      refreshButtons();
+
+      setTimeout(() => {
+        elCodigo.focus();
+      }, 50);
+
+      showToast(`Guardado local ✓ (pendientes: ${pending})`);
+
+      flushQueue();
+    }
+
+    window.sendMovement = sendMovement;
+    flushQueue();
+  </script>
+</body>
+</html>
