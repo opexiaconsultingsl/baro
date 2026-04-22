@@ -202,6 +202,9 @@
     const btnEntrada = document.getElementById("btnEntrada");
     const btnSalida = document.getElementById("btnSalida");
 
+    let autoEntradaLock = false;
+    let autoEntradaTimer = null;
+
     window.addEventListener("load", () => {
       elCodigo.focus();
     });
@@ -224,17 +227,22 @@
       showToast._t = setTimeout(() => (toast.style.opacity = "0"), 1200);
     }
 
-    // VALIDACIONES
-    // Código: 10–14 dígitos numéricos
-    // Ubicación: exactamente 4 caracteres alfanuméricos
+    function isCodigoValido(valor){
+      return /^\d{10,14}$/.test(valor.trim());
+    }
+
+    function isUbicacionValida(valor){
+      return /^[A-Za-z0-9]{4}$/.test(valor.trim());
+    }
+
     function refreshButtons(){
       const codigo = elCodigo.value.trim();
       const ubic = elUbic.value.trim();
 
       const errorCodigo = document.getElementById("codigoError");
 
-      const codigoValido = /^\d{10,14}$/.test(codigo);
-      const ubicValida = /^[A-Za-z0-9]{4}$/.test(ubic);
+      const codigoValido = isCodigoValido(codigo);
+      const ubicValida = isUbicacionValida(ubic);
 
       if(errorCodigo){
         errorCodigo.style.display = (codigo && !codigoValido) ? "block" : "none";
@@ -244,8 +252,34 @@
       btnSalida.disabled = !codigoValido;
     }
 
-    elCodigo.addEventListener("input", refreshButtons);
-    elUbic.addEventListener("input", refreshButtons);
+    function tryAutoEntrada(){
+      clearTimeout(autoEntradaTimer);
+
+      autoEntradaTimer = setTimeout(() => {
+        const codigoValido = isCodigoValido(elCodigo.value);
+        const ubicValida = isUbicacionValida(elUbic.value);
+
+        if (codigoValido && ubicValida && !autoEntradaLock) {
+          autoEntradaLock = true;
+          sendMovement("ENTRADA").finally(() => {
+            setTimeout(() => {
+              autoEntradaLock = false;
+            }, 300);
+          });
+        }
+      }, 120);
+    }
+
+    elCodigo.addEventListener("input", () => {
+      refreshButtons();
+      tryAutoEntrada();
+    });
+
+    elUbic.addEventListener("input", () => {
+      refreshButtons();
+      tryAutoEntrada();
+    });
+
     elNotas.addEventListener("input", refreshButtons);
     elMoverPartidaEntera.addEventListener("change", refreshButtons);
     refreshButtons();
@@ -331,12 +365,12 @@
       const notas = elNotas.value.trim();
       const moverPartidaEntera = elMoverPartidaEntera.checked;
 
-      if(!/^\d{10,14}$/.test(codigo)){
+      if(!isCodigoValido(codigo)){
         showToast("Código inválido (10-14 dígitos)");
         return;
       }
 
-      if(tipo === "ENTRADA" && !/^[A-Za-z0-9]{4}$/.test(ubicacion)){
+      if(tipo === "ENTRADA" && !isUbicacionValida(ubicacion)){
         showToast("Ubicación inválida (4 caracteres alfanuméricos)");
         return;
       }
@@ -365,7 +399,7 @@
 
       showToast(`Guardado local ✓ (pendientes: ${pending})`);
 
-      flushQueue();
+      await flushQueue();
     }
 
     window.sendMovement = sendMovement;
