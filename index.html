@@ -5,16 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Control Stock</title>
 
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0e1b2a">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Control Stock">
+
   <style>
     :root{
       --ink:#0e1b2a;
-
       --green:#7fe28f;
       --green-soft:#f4fdf6;
-
       --red:#e69095;
       --red-soft:#fdf4f4;
-
       --stroke:#0e1b2a;
       --radius:16px;
       --shadow:0 8px 20px rgba(0,0,0,.15);
@@ -202,7 +209,7 @@
     <div class="field input-with-icon">
       <label>CÓDIGO</label>
       <input id="codigo" placeholder="Lee código de barras..." autocomplete="off" autofocus />
-      <svg class="trash-inline" onclick="clearField('codigo')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Borrar código">
+      <svg class="trash-inline" onclick="clearField('codigo')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M3 6h18"></path>
         <path d="M8 6V4h8v2"></path>
         <path d="M19 6l-1 14H6L5 6"></path>
@@ -214,7 +221,7 @@
     <div class="field input-with-icon">
       <label>UBICACIÓN</label>
       <input id="ubicacion" placeholder="Lee código de ubicación" autocomplete="off" />
-      <svg class="trash-inline" onclick="clearField('ubicacion')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Borrar ubicación">
+      <svg class="trash-inline" onclick="clearField('ubicacion')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M3 6h18"></path>
         <path d="M8 6V4h8v2"></path>
         <path d="M19 6l-1 14H6L5 6"></path>
@@ -231,7 +238,7 @@
     <div class="field input-with-icon">
       <label>NOTAS (opcional)</label>
       <textarea id="notas" placeholder="Observaciones..."></textarea>
-      <svg class="trash-inline textarea" onclick="clearField('notas')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Borrar notas">
+      <svg class="trash-inline textarea" onclick="clearField('notas')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M3 6h18"></path>
         <path d="M8 6V4h8v2"></path>
         <path d="M19 6l-1 14H6L5 6"></path>
@@ -245,7 +252,7 @@
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbylxFU7hiKRxFsCBlsmDdQhqKg35Fp74oRLEuHAPCYDxhc2L25TASLJwHWHNc4EQzPs/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbz1luEvP5AOvWbkMxuCmsvSJg1uQhqQjLyUEEbhnvTqK3SExNzFISUceIT5kTQxS0LAqg/exec";
 
     const elCodigo = document.getElementById("codigo");
     const elUbic = document.getElementById("ubicacion");
@@ -290,14 +297,8 @@
       const codigo = elCodigo.value.trim();
       const ubic = elUbic.value.trim();
 
-      const errorCodigo = document.getElementById("codigoError");
-
       const codigoValido = isCodigoValido(codigo);
       const ubicValida = isUbicacionValida(ubic);
-
-      if(errorCodigo){
-        errorCodigo.style.display = (codigo && !codigoValido) ? "block" : "none";
-      }
 
       btnEntrada.disabled = !(codigoValido && ubicValida);
       btnSalida.disabled = !codigoValido;
@@ -345,7 +346,7 @@
     elMoverPartidaEntera.addEventListener("change", refreshButtons);
     refreshButtons();
 
-    const QKEY = "movimientos_queue_v1";
+    const QKEY = "movimientos_queue_v2";
 
     function loadQueue(){
       try { return JSON.parse(localStorage.getItem(QKEY) || "[]"); }
@@ -398,6 +399,7 @@
       try{
         while(queueLength() > 0){
           const item = loadQueue()[0];
+
           try{
             await sendOne(item);
             dequeue();
@@ -460,6 +462,12 @@
       showToast(`Guardado local ✓ (pendientes: ${pending})`);
 
       await flushQueue();
+    }
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js");
+      });
     }
 
     window.sendMovement = sendMovement;
