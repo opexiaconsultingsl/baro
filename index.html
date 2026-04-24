@@ -18,10 +18,13 @@
   <style>
     :root{
       --ink:#0e1b2a;
+
       --green:#7fe28f;
       --green-soft:#f4fdf6;
+
       --red:#e69095;
       --red-soft:#fdf4f4;
+
       --stroke:#0e1b2a;
       --radius:16px;
       --shadow:0 8px 20px rgba(0,0,0,.15);
@@ -208,8 +211,8 @@
 
     <div class="field input-with-icon">
       <label>CÓDIGO</label>
-      <input id="codigo" placeholder="Lee código de barras..." autocomplete="off" autofocus />
-      <svg class="trash-inline" onclick="clearField('codigo')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <input id="codigo" placeholder="Lee código de barras de la fruta..." autocomplete="off" autofocus />
+      <svg class="trash-inline" onclick="clearField('codigo')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Borrar código">
         <path d="M3 6h18"></path>
         <path d="M8 6V4h8v2"></path>
         <path d="M19 6l-1 14H6L5 6"></path>
@@ -220,8 +223,8 @@
 
     <div class="field input-with-icon">
       <label>UBICACIÓN</label>
-      <input id="ubicacion" placeholder="Lee código de ubicación" autocomplete="off" />
-      <svg class="trash-inline" onclick="clearField('ubicacion')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <input id="ubicacion" placeholder="Lee QR de ubicación..." autocomplete="off" />
+      <svg class="trash-inline" onclick="clearField('ubicacion')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Borrar ubicación">
         <path d="M3 6h18"></path>
         <path d="M8 6V4h8v2"></path>
         <path d="M19 6l-1 14H6L5 6"></path>
@@ -238,7 +241,7 @@
     <div class="field input-with-icon">
       <label>NOTAS (opcional)</label>
       <textarea id="notas" placeholder="Observaciones..."></textarea>
-      <svg class="trash-inline textarea" onclick="clearField('notas')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg class="trash-inline textarea" onclick="clearField('notas')" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Borrar notas">
         <path d="M3 6h18"></path>
         <path d="M8 6V4h8v2"></path>
         <path d="M19 6l-1 14H6L5 6"></path>
@@ -252,7 +255,7 @@
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbz1luEvP5AOvWbkMxuCmsvSJg1uQhqQjLyUEEbhnvTqK3SExNzFISUceIT5kTQxS0LAqg/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbylxFU7hiKRxFsCBlsmDdQhqKg35Fp74oRLEuHAPCYDxhc2L25TASLJwHWHNc4EQzPs/exec";
 
     const elCodigo = document.getElementById("codigo");
     const elUbic = document.getElementById("ubicacion");
@@ -263,9 +266,20 @@
 
     let autoEntradaLock = false;
     let autoEntradaTimer = null;
+    let sending = false;
 
-    window.addEventListener("load", () => {
-      elCodigo.focus();
+    function focusCodigo(){
+      setTimeout(() => {
+        elCodigo.focus();
+        elCodigo.select();
+      }, 250);
+    }
+
+    window.addEventListener("load", focusCodigo);
+    window.addEventListener("pageshow", focusCodigo);
+
+    document.addEventListener("visibilitychange", () => {
+      if(!document.hidden) focusCodigo();
     });
 
     const toast = document.createElement("div");
@@ -310,7 +324,7 @@
 
       el.value = "";
       refreshButtons();
-      el.focus();
+      focusCodigo();
       showToast("Campo borrado");
     }
 
@@ -323,6 +337,7 @@
 
         if(codigoValido && ubicValida && !autoEntradaLock){
           autoEntradaLock = true;
+
           sendMovement("ENTRADA").finally(() => {
             setTimeout(() => {
               autoEntradaLock = false;
@@ -344,13 +359,15 @@
 
     elNotas.addEventListener("input", refreshButtons);
     elMoverPartidaEntera.addEventListener("change", refreshButtons);
-    refreshButtons();
 
-    const QKEY = "movimientos_queue_v2";
+    const QKEY = "movimientos_queue_v3";
 
     function loadQueue(){
-      try { return JSON.parse(localStorage.getItem(QKEY) || "[]"); }
-      catch { return []; }
+      try {
+        return JSON.parse(localStorage.getItem(QKEY) || "[]");
+      } catch {
+        return [];
+      }
     }
 
     function saveQueue(q){
@@ -375,10 +392,9 @@
       return loadQueue().length;
     }
 
-    let sending = false;
-
     async function sendOne(item){
       const url = new URL(API_URL);
+
       url.searchParams.set("tipo", item.tipo);
       url.searchParams.set("codigo", item.codigo);
       url.searchParams.set("ubicacion", item.ubicacion);
@@ -387,13 +403,21 @@
       url.searchParams.set("ts_client", item.ts_client);
       url.searchParams.set("id", item.id);
 
-      const res = await fetch(url.toString(), { method:"GET", cache:"no-store" });
+      const res = await fetch(url.toString(), {
+        method:"GET",
+        cache:"no-store"
+      });
+
       const data = await res.json().catch(() => ({}));
-      if(!(res.ok && data.ok)) throw new Error("API error");
+
+      if(!(res.ok && data.ok)){
+        throw new Error("API error");
+      }
     }
 
     async function flushQueue(){
       if(sending) return;
+
       sending = true;
 
       try{
@@ -429,11 +453,13 @@
 
       if(!isCodigoValido(codigo)){
         showToast("Código inválido (10-14 dígitos)");
+        focusCodigo();
         return;
       }
 
       if(tipo === "ENTRADA" && !isUbicacionValida(ubicacion)){
         showToast("Ubicación inválida (4 caracteres alfanuméricos)");
+        focusCodigo();
         return;
       }
 
@@ -453,11 +479,9 @@
       elNotas.value = "";
       elUbic.value = "";
       elMoverPartidaEntera.checked = false;
-      refreshButtons();
 
-      setTimeout(() => {
-        elCodigo.focus();
-      }, 50);
+      refreshButtons();
+      focusCodigo();
 
       showToast(`Guardado local ✓ (pendientes: ${pending})`);
 
@@ -472,6 +496,8 @@
 
     window.sendMovement = sendMovement;
     window.clearField = clearField;
+
+    refreshButtons();
     flushQueue();
   </script>
 </body>
